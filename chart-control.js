@@ -188,7 +188,7 @@ class ChartControl extends HTMLElement {
     const chartType = this.shadowRoot.querySelector('.chart-type').value;
     
     const colors = [
-      '#FFB3BA', '#BAFFC9', '#BAE1FF', '#FFD8B1',
+      '#BAE1FF', '#BAFFC9', '#FFB3BA', '#FFD8B1',
       '#E6C9FF', '#B4F8C8', '#FBE7C6', '#D8E2DC',
       '#A0E7E5', '#FFC7C7'
     ];
