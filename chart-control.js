@@ -1,4 +1,3 @@
-// chart-control.js
 const template = document.createElement('template');
 template.innerHTML = `
 <style>
@@ -23,7 +22,6 @@ template.innerHTML = `
     gap: 12px;
     margin-bottom: 1rem;
   }
-
   input {
     padding: 0.6rem 1rem;
     border: 2px solid #ddd;
@@ -33,16 +31,14 @@ template.innerHTML = `
     font-family: var(--chart-font);
     transition: border-color 0.3s, box-shadow 0.3s;
   }
-
   input:focus {
     border-color: #2563EB;
     box-shadow: 0 0 5px rgba(37, 99, 235, 0.3);
     outline: none;
   }
-
   button {
     padding: 0.6rem 1.2rem;
-    background: #1E3A8A; /* 深蓝色 */
+    background: #1E3A8A;
     color: white;
     border: none;
     border-radius: 6px;
@@ -51,28 +47,24 @@ template.innerHTML = `
     font-family: var(--chart-font);
     transition: background 0.3s, transform 0.2s;
   }
-
   button:hover {
-    background: #2563EB; /* 亮一点的蓝色 */
+    background: #2563EB;
     transform: scale(1.05);
   }
-
   .button-group {
     display: flex;
     justify-content: center;
     margin-top: 1rem;
   }
-
   .data-list {
     margin: 1rem 0;
     border-radius: 6px;
     max-height: 200px;
     overflow-y: auto;
-    background: #F3F4F6; /* 淡灰色背景 */
+    background: #F3F4F6;
     padding: 0.5rem;
     border: 2px solid #E5E7EB;
   }
-
   .data-item {
     display: flex;
     justify-content: space-between;
@@ -85,42 +77,35 @@ template.innerHTML = `
     margin: 4px 0;
     transition: background 0.3s, box-shadow 0.3s;
   }
-
   .data-item:hover {
-    background: #E0E7FF; /* 淡蓝色背景 */
+    background: #E0E7FF;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   }
-
   .data-item:last-child {
     border-bottom: none;
   }
-
   .delete-btn {
-    background: #DC2626; /* 红色 */
+    background: #DC2626;
     color: white;
     padding: 0.4rem 0.8rem;
     border-radius: 4px;
     cursor: pointer;
     transition: background 0.3s, transform 0.2s;
   }
-
   .delete-btn:hover {
-    background: #B91C1C; /* 深红色 */
+    background: #B91C1C;
     transform: scale(1.1);
   }
-
   .chart-container {
     display: flex;
     justify-content: center;
     margin-top: 1rem;
   }
-
   .chart {
     width: var(--chart-size);
     height: var(--chart-size);
   }
 </style>
-
 <div class="control-panel">
   <div class="input-group">
     <input type="text" class="category" placeholder="分类名称">
@@ -141,20 +126,30 @@ class ChartControl extends HTMLElement {
     super();
     this.tempDataStorage = [];
     this.chartInstance = null;
+    this.echarts = null; // 用于存储动态加载的 ECharts
     this.attachShadow({ mode: 'open' });
     this.shadowRoot.appendChild(template.content.cloneNode(true));
   }
 
-  connectedCallback() {
-    this.chartInstance = echarts.init(this.shadowRoot.querySelector('.chart'));
-    
-    this.shadowRoot.querySelector('.add-btn').addEventListener('click', () => this.addDataItem());
-    this.shadowRoot.querySelector('.render-btn').addEventListener('click', () => this.renderChart());
-    this.shadowRoot.querySelector('.data-list').addEventListener('click', e => {
-      if (e.target.classList.contains('delete-btn')) {
-        this.deleteDataItem(e.target.dataset.index);
-      }
-    });
+  async connectedCallback() {
+    try {
+      // 动态加载 ECharts
+      await import('https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js');
+      this.echarts = window.echarts; // 由于 import 不能直接加载 UMD 模块，需要从 window 取出
+
+      // 初始化图表
+      this.chartInstance = this.echarts.init(this.shadowRoot.querySelector('.chart'));
+
+      this.shadowRoot.querySelector('.add-btn').addEventListener('click', () => this.addDataItem());
+      this.shadowRoot.querySelector('.render-btn').addEventListener('click', () => this.renderChart());
+      this.shadowRoot.querySelector('.data-list').addEventListener('click', e => {
+        if (e.target.classList.contains('delete-btn')) {
+          this.deleteDataItem(e.target.dataset.index);
+        }
+      });
+    } catch (error) {
+      console.error('ECharts 加载失败:', error);
+    }
   }
 
   addDataItem() {
@@ -162,24 +157,27 @@ class ChartControl extends HTMLElement {
     const valueInput = this.shadowRoot.querySelector('.value');
     
     if (!categoryInput.value || !valueInput.value) return;
-
     this.tempDataStorage.push({
       category: categoryInput.value,
       value: parseFloat(valueInput.value)
     });
-
     this.updateDataList();
     categoryInput.value = '';
     valueInput.value = '';
   }
 
   renderChart() {
+    if (!this.echarts || !this.chartInstance) {
+      console.error('ECharts 未加载成功，无法渲染图表');
+      return;
+    }
+
     const colors = [
       '#FFB3BA', '#BAFFC9', '#BAE1FF', '#FFD8B1',
       '#E6C9FF', '#B4F8C8', '#FBE7C6', '#D8E2DC',
       '#A0E7E5', '#FFC7C7'
-    ]; // 预定义一组不同的颜色
-  
+    ];
+
     const option = {
       tooltip: {
         trigger: 'item'
@@ -190,12 +188,12 @@ class ChartControl extends HTMLElement {
           value: item.value,
           name: item.category,
           itemStyle: {
-            color: colors[index % colors.length] // 轮流使用颜色数组中的颜色
+            color: colors[index % colors.length]
           }
         }))
       }]
     };
-  
+
     this.chartInstance.setOption(option);
   }
 
