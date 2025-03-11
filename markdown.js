@@ -376,6 +376,7 @@ class MarkdownArea extends HTMLElement {
   }
   
   _updateZoom() {
+    const a = 0;
     const editor = this.shadowRoot.getElementById('editor');
     const preview = this.shadowRoot.getElementById('preview');
     const zoomLevelEl = this.shadowRoot.querySelector('.zoom-level');
