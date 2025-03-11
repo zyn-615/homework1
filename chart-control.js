@@ -125,23 +125,25 @@ class ChartControl extends HTMLElement {
   }
 
   renderChart() {
+    const colors = [
+      '#FFB3BA', '#BAFFC9', '#BAE1FF', '#FFD8B1',
+      '#E6C9FF', '#B4F8C8', '#FBE7C6', '#D8E2DC',
+      '#A0E7E5', '#FFC7C7'
+    ]; // 预定义一组不同的颜色
+  
     const option = {
       tooltip: {
         trigger: 'item'
       },
-      xAxis: {
-        type: 'category',
-        data: this.tempDataStorage.map(item => item.category) // 加上 data 键名
-      },
-      yAxis: {
-        type: 'value'
-      },
       series: [{
-        data: this.tempDataStorage.map(item => item.value), // 同样加上 data 键名
         type: 'pie',
-        itemStyle: {
-          color: '#4CAF50'
-        }
+        data: this.tempDataStorage.map((item, index) => ({
+          value: item.value,
+          name: item.category,
+          itemStyle: {
+            color: colors[index % colors.length] // 轮流使用颜色数组中的颜色
+          }
+        }))
       }]
     };
   
