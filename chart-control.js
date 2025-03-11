@@ -8,64 +8,113 @@ template.innerHTML = `
     --chart-font: 'Segoe UI', sans-serif;
     --chart-border: 2px solid #e0e0e0;
   }
+  
   .control-panel {
     margin: 2rem 0;
     padding: 1.5rem;
-    background: #f8f9fa;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     max-width: 600px;
   }
+  
   .input-group {
     display: flex;
-    gap: 10px;
+    gap: 12px;
     margin-bottom: 1rem;
   }
+
   input {
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    padding: 0.6rem 1rem;
+    border: 2px solid #ddd;
+    border-radius: 6px;
     flex: 1;
+    font-size: 1rem;
     font-family: var(--chart-font);
+    transition: border-color 0.3s, box-shadow 0.3s;
   }
+
+  input:focus {
+    border-color: #2563EB;
+    box-shadow: 0 0 5px rgba(37, 99, 235, 0.3);
+    outline: none;
+  }
+
   button {
-    padding: 0.5rem 1rem;
-    background: #4CAF50;
+    padding: 0.6rem 1.2rem;
+    background: #1E3A8A; /* 深蓝色 */
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
-    transition: opacity 0.3s;
+    font-size: 1rem;
     font-family: var(--chart-font);
+    transition: background 0.3s, transform 0.2s;
   }
+
   button:hover {
-    opacity: 0.8;
+    background: #2563EB; /* 亮一点的蓝色 */
+    transform: scale(1.05);
   }
+
+  .button-group {
+    display: flex;
+    justify-content: center;
+    margin-top: 1rem;
+  }
+
   .data-list {
     margin: 1rem 0;
-    border: var(--chart-border);
-    border-radius: 4px;
+    border-radius: 6px;
     max-height: 200px;
     overflow-y: auto;
+    background: #F3F4F6; /* 淡灰色背景 */
+    padding: 0.5rem;
+    border: 2px solid #E5E7EB;
   }
+
   .data-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 0.8rem;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid #ddd;
     font-family: var(--chart-font);
+    background: #ffffff;
+    border-radius: 6px;
+    margin: 4px 0;
+    transition: background 0.3s, box-shadow 0.3s;
   }
+
+  .data-item:hover {
+    background: #E0E7FF; /* 淡蓝色背景 */
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  }
+
   .data-item:last-child {
     border-bottom: none;
   }
+
   .delete-btn {
-    background: #ff6b6b;
+    background: #DC2626; /* 红色 */
     color: white;
-    padding: 0.3rem 0.8rem;
-    border-radius: 3px;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
     cursor: pointer;
+    transition: background 0.3s, transform 0.2s;
   }
+
+  .delete-btn:hover {
+    background: #B91C1C; /* 深红色 */
+    transform: scale(1.1);
+  }
+
+  .chart-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 1rem;
+  }
+
   .chart {
     width: var(--chart-size);
     height: var(--chart-size);
