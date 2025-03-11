@@ -1,12 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+</head>
+<body>
+  <!-- 使用自定义组件 -->
+  <chart-control></chart-control>
+  <chart-control style="--chart-size: 350px"></chart-control>
+
+<template id="chart-control-template">
   <style>
-    /* 原有样式保持不变 */
-    :root { --chart-size: 400px; --chart-font: 'Segoe UI', sans-serif; --chart-border: 2px solid #e0e0e0; }
-    .control-panel { margin: 2rem 0; padding: 1.5rem; background: #f8f9fa; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 600px; }
-    
-    /* 新增数据列表样式 */
+    :host {
+      display: block;
+      --chart-size: 400px;
+      --chart-font: 'Segoe UI', sans-serif;
+      --chart-border: 2px solid #e0e0e0;
+    }
+
+    .control-panel {
+      margin: 2rem 0;
+      padding: 1.5rem;
+      background: #f8f9fa;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      max-width: 600px;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 1rem;
+    }
+
+    input {
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      flex: 1;
+    }
+
+    button {
+      padding: 0.5rem 1rem;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: opacity 0.3s;
+    }
+
+    button:hover {
+      opacity: 0.8;
+    }
+
     .data-list {
       margin: 1rem 0;
       border: var(--chart-border);
@@ -14,6 +60,7 @@
       max-height: 200px;
       overflow-y: auto;
     }
+
     .data-item {
       display: flex;
       justify-content: space-between;
@@ -21,7 +68,11 @@
       padding: 0.8rem;
       border-bottom: 1px solid #eee;
     }
-    .data-item:last-child { border-bottom: none; }
+
+    .data-item:last-child {
+      border-bottom: none;
+    }
+
     .delete-btn {
       background: #ff6b6b;
       color: white;
@@ -29,89 +80,124 @@
       border-radius: 3px;
       cursor: pointer;
     }
+
+    .chart {
+      width: var(--chart-size);
+      height: var(--chart-size);
+    }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
-</head>
-<body>
+
   <div class="control-panel">
     <div class="input-group">
-      <input type="text" id="category" placeholder="输入分类名称">
-      <input type="number" id="value" placeholder="输入数值">
-      <button id="addBtn" onclick="addDataItem()">添加数据</button>
+      <input type="text" class="category" placeholder="分类名称">
+      <input type="number" class="value" placeholder="数值">
+      <button class="add-btn">添加</button>
     </div>
     <div class="button-group">
-      <button id="renderBtn" onclick="renderChart()">生成图表</button>
+      <button class="render-btn">生成图表</button>
     </div>
-    <!-- 新增数据列表容器 -->
-    <div class="data-list" id="dataList"></div>
+    <div class="data-list"></div>
   </div>
   <div class="chart-container">
-    <div id="chart" style="width: var(--chart-size); height: var(--chart-size);"></div>
+    <div class="chart"></div>
   </div>
-  <script>
-    let tempDataStorage = [];
-    let chartInstance = null;
+</template>
 
-    // 新增：更新数据列表显示
-    function updateDataList() {
-      const listContainer = document.getElementById('dataList');
-      listContainer.innerHTML = tempDataStorage.map((item, index) => `
+<script>
+class ChartControl extends HTMLElement {
+  constructor() {
+    super();
+    this.tempDataStorage = [];
+    this.chartInstance = null;
+
+    // 创建 Shadow DOM
+    const template = document.getElementById('chart-control-template');
+    const content = template.content.cloneNode(true);
+    this.attachShadow({ mode: 'open' }).appendChild(content);
+  }
+
+  connectedCallback() {
+    // 初始化图表
+    this.chartInstance = echarts.init(this.shadowRoot.querySelector('.chart'));
+    
+    // 绑定事件
+    this.shadowRoot.querySelector('.add-btn').addEventListener('click', () => this.addDataItem());
+    this.shadowRoot.querySelector('.render-btn').addEventListener('click', () => this.renderChart());
+    this.shadowRoot.querySelector('.data-list').addEventListener('click', e => {
+      if (e.target.classList.contains('delete-btn')) {
+        const index = e.target.closest('.data-item').dataset.index;
+        this.handleDelete(index);
+      }
+    });
+  }
+
+  disconnectedCallback() {
+    // 清理图表实例
+    if (this.chartInstance) {
+      this.chartInstance.dispose();
+    }
+  }
+
+  addDataItem() {
+    const category = this.shadowRoot.querySelector('.category').value.trim();
+    const value = Number(this.shadowRoot.querySelector('.value').value);
+
+    if (category && value > 0) {
+      this.tempDataStorage.push({ label: category, value });
+      this.clearInputs();
+      this.updateDataList();
+    } else {
+      alert('请输入有效的分类名称和正数数值');
+    }
+  }
+
+  handleDelete(index) {
+    this.tempDataStorage.splice(index, 1);
+    this.updateDataList();
+    if (this.chartInstance) this.renderChart();
+  }
+
+  updateDataList() {
+    const listContainer = this.shadowRoot.querySelector('.data-list');
+    listContainer.innerHTML = this.tempDataStorage
+      .map((item, index) => `
         <div class="data-item" data-index="${index}">
           <span>${item.label}：${item.value}</span>
           <div class="delete-btn">删除</div>
         </div>
-      `).join('');
-    }
+      `)
+      .join('');
+  }
 
-    // 修改后的添加数据函数
-    function addDataItem() {
-      const category = document.getElementById('category').value.trim();
-      const value = Number(document.getElementById('value').value);
-      if (category && value > 0) {
-        tempDataStorage.push({ label: category, value });
-        document.getElementById('category').value = '';
-        document.getElementById('value').value = '';
-        updateDataList(); // 新增：更新列表显示
-      } else {
-        alert('请输入有效的分类名称和正数数值');
-      }
-    }
+  renderChart() {
+    const option = {
+      title: {
+        text: '数据分布图',
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'item'
+      },
+      series: [{
+        type: 'pie',
+        data: this.tempDataStorage.map(item => ({
+          name: item.label,
+          value: item.value
+        }))  
+      }]
 
-    // 新增：删除数据项函数
-    function handleDelete(index) {
-      tempDataStorage.splice(index, 1);
-      updateDataList();
-      if (chartInstance) renderChart(); // 删除后自动更新图表
-    }
+    };
+    this.chartInstance.setOption(option);
+  }
 
-    // 事件委托处理删除操作
-    document.getElementById('dataList').addEventListener('click', (e) => {
-      if (e.target.classList.contains('delete-btn')) {
-        const index = e.target.closest('.data-item').dataset.index;
-        handleDelete(index);
-      }
-    });
+  clearInputs() {
+    this.shadowRoot.querySelector('.category').value = '';
+    this.shadowRoot.querySelector('.value').value = '';
+  }
+}
 
-    // 修改后的渲染图表函数
-    function renderChart() {
-      if (!tempDataStorage.length) {
-        alert('请先添加数据');
-        return;
-      }
-      const option = {
-        tooltip: { trigger: 'item' },
-        series: [{
-          type: 'pie',
-          data: tempDataStorage.map(item => ({ name: item.label, value: item.value })),
-          radius: '70%',
-          itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 }
-        }]
-      };
-      if (!chartInstance) {
-        chartInstance = echarts.init(document.getElementById('chart'));
-      }
-      chartInstance.setOption(option);
-    }
-  </script>
+// 注册自定义元素
+customElements.define('chart-control', ChartControl);
+</script>
 </body>
 </html>
