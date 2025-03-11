@@ -22,7 +22,7 @@ template.innerHTML = `
     gap: 12px;
     margin-bottom: 1rem;
   }
-  input {
+  input, select {
     padding: 0.6rem 1rem;
     border: 2px solid #ddd;
     border-radius: 6px;
@@ -31,7 +31,7 @@ template.innerHTML = `
     font-family: var(--chart-font);
     transition: border-color 0.3s, box-shadow 0.3s;
   }
-  input:focus {
+  input:focus, select:focus {
     border-color: #2563EB;
     box-shadow: 0 0 5px rgba(37, 99, 235, 0.3);
     outline: none;
@@ -110,6 +110,11 @@ template.innerHTML = `
   <div class="input-group">
     <input type="text" class="category" placeholder="分类名称">
     <input type="number" class="value" placeholder="数值">
+    <!-- 新增选择图表类型的下拉菜单 -->
+    <select class="chart-type">
+      <option value="pie">饼状图</option>
+      <option value="bar">柱状图</option>
+    </select>
     <button class="add-btn">添加</button>
   </div>
   <div class="button-group">
@@ -171,29 +176,91 @@ class ChartControl extends HTMLElement {
       console.error('ECharts 未加载成功，无法渲染图表');
       return;
     }
-
+    
+    // 获取用户选择的图表类型
+    const chartType = this.shadowRoot.querySelector('.chart-type').value;
+    
     const colors = [
       '#FFB3BA', '#BAFFC9', '#BAE1FF', '#FFD8B1',
       '#E6C9FF', '#B4F8C8', '#FBE7C6', '#D8E2DC',
       '#A0E7E5', '#FFC7C7'
     ];
-
-    const option = {
+    
+    let option = {
       tooltip: {
         trigger: 'item'
-      },
-      series: [{
+      }
+    };
+    
+    if (chartType === 'pie') {
+      option.series = [{
         type: 'pie',
+        radius: ['40%', '70%'], // 设定内外半径，避免标签遮挡
+        center: ['50%', '50%'],
         data: this.tempDataStorage.map((item, index) => ({
           value: item.value,
           name: item.category,
           itemStyle: {
             color: colors[index % colors.length]
           }
-        }))
-      }]
-    };
-
+        })),
+        label: {
+          show: true,
+          position: 'outside', // 让标签显示在饼图外部
+          formatter: '{b}', // 只显示名称，不显示数值
+          fontSize: 14,
+          overflow: 'break', // 防止文本被省略
+          rich: {
+            name: {
+              fontSize: 14,
+              color: '#333'
+            }
+          }
+        },
+        labelLine: {
+          show: true, // 连接线，提升可读性
+          length: 15,  // 第一段线长
+          length2: 10  // 第二段线长
+        },
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          }
+        },
+        animationType: 'scale',
+        animationEasing: 'elasticOut'
+      }];
+    } else if (chartType === 'bar') {
+      // 柱状图配置
+      option.xAxis = {
+        type: 'category',
+        data: this.tempDataStorage.map(item => item.category),
+        axisLabel: {
+          interval: 0,
+          rotate: 30
+        }
+      };
+      option.yAxis = {
+        type: 'value'
+      };
+      option.series = [{
+        type: 'bar',
+        data: this.tempDataStorage.map((item, index) => ({
+          value: item.value,
+          itemStyle: {
+            color: colors[index % colors.length]
+          }
+        })),
+        label: {
+          show: true,
+          position: 'top',
+          fontSize: 14
+        },
+        animationEasing: 'elasticOut'
+      }];
+    }
+    
     this.chartInstance.setOption(option);
   }
 
