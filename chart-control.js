@@ -22,16 +22,16 @@ template.innerHTML = `
     gap: 8px;
     margin-bottom: 1rem;
   }
-  /* 输入框和下拉菜单扁平化：减小内边距、高度和圆角 */
+  /* 修改输入框和下拉菜单，让它们高度一致、内边距更小，更扁平 */
   input, select {
-    padding: 0.2rem 0.5rem;
+    padding: 0.1rem 0.5rem;
     border: 2px solid #ddd;
-    border-radius: 3px;
+    border-radius: 2px;
     flex: 1;
     font-size: 0.9rem;
     font-family: var(--chart-font);
     transition: border-color 0.3s, box-shadow 0.3s;
-    height: 2rem;
+    height: 1.8rem;
   }
   input:focus, select:focus {
     border-color: #2563EB;
@@ -39,7 +39,7 @@ template.innerHTML = `
     outline: none;
   }
   
-  /* 按钮扁平化：减小内边距、高度和圆角 */
+  /* 按钮样式 */
   button {
     padding: 0.2rem 1rem;
     background: #1E3A8A;
@@ -82,14 +82,41 @@ template.innerHTML = `
     background: #ffffff;
     border-radius: 6px;
     margin: 4px 0;
-    transition: background 0.3s, box-shadow 0.3s;
+    transition: all 0.3s ease;
   }
   .data-item:hover {
     background: #E0E7FF;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
   }
   .data-item:last-child {
     border-bottom: none;
+  }
+  .data-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 80%;
+  }
+  .data-category, .data-value {
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+  .data-category {
+    background-color: #EFF6FF;
+    font-weight: 500;
+  }
+  .data-value {
+    background-color: #F0FDF4;
+    text-align: right;
+    font-weight: 600;
+  }
+  .data-item:hover .data-category {
+    background-color: #DBEAFE;
+  }
+  .data-item:hover .data-value {
+    background-color: #DCFCE7;
   }
   .delete-btn {
     background: #DC2626;
@@ -148,10 +175,8 @@ class ChartControl extends HTMLElement {
       // 动态加载 ECharts
       await import('https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js');
       this.echarts = window.echarts; // 由于 import 不能直接加载 UMD 模块，需要从 window 取出
-
       // 初始化图表
       this.chartInstance = this.echarts.init(this.shadowRoot.querySelector('.chart'));
-
       this.shadowRoot.querySelector('.add-btn').addEventListener('click', () => this.addDataItem());
       this.shadowRoot.querySelector('.render-btn').addEventListener('click', () => this.renderChart());
       this.shadowRoot.querySelector('.data-list').addEventListener('click', e => {
@@ -159,9 +184,52 @@ class ChartControl extends HTMLElement {
           this.deleteDataItem(e.target.dataset.index);
         }
       });
+      
+      // 添加悬停事件处理
+      this.shadowRoot.querySelector('.data-list').addEventListener('mouseover', e => {
+        const dataItem = e.target.closest('.data-item');
+        if (dataItem && this.chartInstance) {
+          const index = parseInt(dataItem.dataset.index);
+          this.highlightChartItem(index);
+        }
+      });
+      
+      this.shadowRoot.querySelector('.data-list').addEventListener('mouseout', e => {
+        if (this.chartInstance) {
+          this.resetChartHighlight();
+        }
+      });
     } catch (error) {
       console.error('ECharts 加载失败:', error);
     }
+  }
+  
+  highlightChartItem(index) {
+    if (!this.chartInstance) return;
+    
+    // 使用 ECharts 的 dispatchAction 方法高亮对应数据项
+    const chartType = this.shadowRoot.querySelector('.chart-type').value;
+    if (chartType === 'pie') {
+      this.chartInstance.dispatchAction({
+        type: 'highlight',
+        seriesIndex: 0,
+        dataIndex: index
+      });
+    } else if (chartType === 'bar') {
+      this.chartInstance.dispatchAction({
+        type: 'highlight',
+        seriesIndex: 0,
+        dataIndex: index
+      });
+    }
+  }
+  
+  resetChartHighlight() {
+    if (!this.chartInstance) return;
+    
+    this.chartInstance.dispatchAction({
+      type: 'downplay'
+    });
   }
 
   addDataItem() {
@@ -195,12 +263,14 @@ class ChartControl extends HTMLElement {
     
     let option = {
       tooltip: {
-        trigger: 'item'
+        trigger: 'item',
+        formatter: '{a} <br/>{b}: {c} ({d}%)'
       }
     };
     
     if (chartType === 'pie') {
       option.series = [{
+        name: '数据分布',
         type: 'pie',
         radius: ['40%', '70%'],
         center: ['50%', '50%'],
@@ -232,8 +302,13 @@ class ChartControl extends HTMLElement {
         emphasis: {
           itemStyle: {
             shadowBlur: 10,
-            shadowColor: 'rgba(0, 0, 0, 0.5)'
-          }
+            shadowColor: 'rgba(0, 0, 0, 0.5)',
+            shadowOffsetX: 0,
+            shadowOffsetY: 0,
+            borderWidth: 2,
+            borderColor: '#fff'
+          },
+          scale: true
         },
         animationType: 'scale',
         animationEasing: 'elasticOut'
@@ -251,6 +326,7 @@ class ChartControl extends HTMLElement {
         type: 'value'
       };
       option.series = [{
+        name: '数据值',
         type: 'bar',
         data: this.tempDataStorage.map((item, index) => ({
           value: item.value,
@@ -262,6 +338,14 @@ class ChartControl extends HTMLElement {
           show: true,
           position: 'top',
           fontSize: 14
+        },
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowColor: 'rgba(0, 0, 0, 0.5)',
+            borderWidth: 1,
+            borderColor: '#fff'
+          }
         },
         animationEasing: 'elasticOut'
       }];
@@ -281,8 +365,11 @@ class ChartControl extends HTMLElement {
     const dataList = this.shadowRoot.querySelector('.data-list');
     dataList.innerHTML = this.tempDataStorage
       .map((item, index) => `
-        <div class="data-item">
-          <span>${item.category}: ${item.value}</span>
+        <div class="data-item" data-index="${index}">
+          <div class="data-info">
+            <div class="data-category">${item.category}</div>
+            <div class="data-value">${item.value}</div>
+          </div>
           <div class="delete-btn" data-index="${index}">删除</div>
         </div>
       `).join('');
