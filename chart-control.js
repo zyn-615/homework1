@@ -19,38 +19,45 @@ template.innerHTML = `
   
   .input-group {
     display: flex;
-    gap: 12px;
+    gap: 8px;
     margin-bottom: 1rem;
   }
+  /* 输入框和下拉菜单扁平化：减小内边距、高度和圆角 */
   input, select {
-    padding: 0.6rem 1rem;
+    padding: 0.2rem 0.5rem;
     border: 2px solid #ddd;
-    border-radius: 6px;
+    border-radius: 3px;
     flex: 1;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-family: var(--chart-font);
     transition: border-color 0.3s, box-shadow 0.3s;
+    height: 2rem;
   }
   input:focus, select:focus {
     border-color: #2563EB;
     box-shadow: 0 0 5px rgba(37, 99, 235, 0.3);
     outline: none;
   }
+  
+  /* 按钮扁平化：减小内边距、高度和圆角 */
   button {
-    padding: 0.6rem 1.2rem;
+    padding: 0.2rem 1rem;
     background: #1E3A8A;
     color: white;
     border: none;
-    border-radius: 6px;
+    border-radius: 3px;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-family: var(--chart-font);
     transition: background 0.3s, transform 0.2s;
+    height: 2rem;
+    line-height: 1.6rem;
   }
   button:hover {
     background: #2563EB;
     transform: scale(1.05);
   }
+  
   .button-group {
     display: flex;
     justify-content: center;
@@ -87,8 +94,8 @@ template.innerHTML = `
   .delete-btn {
     background: #DC2626;
     color: white;
-    padding: 0.4rem 0.8rem;
-    border-radius: 4px;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
     cursor: pointer;
     transition: background 0.3s, transform 0.2s;
   }
@@ -195,7 +202,7 @@ class ChartControl extends HTMLElement {
     if (chartType === 'pie') {
       option.series = [{
         type: 'pie',
-        radius: ['40%', '70%'], // 设定内外半径，避免标签遮挡
+        radius: ['40%', '70%'],
         center: ['50%', '50%'],
         data: this.tempDataStorage.map((item, index) => ({
           value: item.value,
@@ -206,10 +213,10 @@ class ChartControl extends HTMLElement {
         })),
         label: {
           show: true,
-          position: 'outside', // 让标签显示在饼图外部
-          formatter: '{b}', // 只显示名称，不显示数值
+          position: 'outside',
+          formatter: '{b}',
           fontSize: 14,
-          overflow: 'break', // 防止文本被省略
+          overflow: 'break',
           rich: {
             name: {
               fontSize: 14,
@@ -218,9 +225,9 @@ class ChartControl extends HTMLElement {
           }
         },
         labelLine: {
-          show: true, // 连接线，提升可读性
-          length: 15,  // 第一段线长
-          length2: 10  // 第二段线长
+          show: true,
+          length: 15,
+          length2: 10
         },
         emphasis: {
           itemStyle: {
@@ -232,7 +239,6 @@ class ChartControl extends HTMLElement {
         animationEasing: 'elasticOut'
       }];
     } else if (chartType === 'bar') {
-      // 柱状图配置
       option.xAxis = {
         type: 'category',
         data: this.tempDataStorage.map(item => item.category),
@@ -261,7 +267,8 @@ class ChartControl extends HTMLElement {
       }];
     }
     
-    this.chartInstance.setOption(option);
+    // 传入第二个参数 true，确保清除上一次的配置（例如柱状图的坐标）
+    this.chartInstance.setOption(option, true);
   }
 
   deleteDataItem(index) {
