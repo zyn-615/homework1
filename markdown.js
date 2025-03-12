@@ -1,459 +1,482 @@
-class MarkdownArea extends HTMLElement {
+// 自定义Web组件: markdown-renderer
+class MarkdownRenderer extends HTMLElement {
   constructor() {
-    super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    
-    // 添加KaTeX和编辑器样式到Shadow DOM
-    const style = document.createElement('style');
-    style.textContent = `
-      /* 整体容器样式 */
-      :host {
-        display: block;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        --primary-color: #5eb2f2;
-        --toolbar-bg: #f8f9fa;
-        --border-color: #e0e0e0;
-        --hover-color: #eaf5ff;
-      }
+      super();
       
-      /* 内联KaTeX核心样式 */
-      .katex { font: normal 1.21em KaTeX_Main, Times New Roman, serif !important; }
-      .katex .base { white-space: pre-wrap; }
+      // 创建Shadow DOM以隔离样式
+      this.attachShadow({ mode: 'open' });
       
-      /* 工具栏样式 */
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        background-color: var(--toolbar-bg);
-        border: 1px solid var(--border-color);
-        border-bottom: none;
-        padding: 6px;
-        border-radius: 4px 4px 0 0;
-      }
+      // 初始化缩放级别
+      this.zoomLevel = 1.0;
       
-      .toolbar-group {
-        display: flex;
-        margin-right: 12px;
-        align-items: center;
-      }
+      // 创建工具栏
+      this.toolbar = document.createElement('div');
+      this.toolbar.className = 'toolbar';
       
-      .toolbar-separator {
-        width: 1px;
-        background-color: var(--border-color);
-        height: 24px;
-        margin: 0 8px;
-      }
+      // 创建内容容器
+      this.contentContainer = document.createElement('div');
+      this.contentContainer.className = 'markdown-content';
       
-      .toolbar-button {
-        background: none;
-        border: 1px solid transparent;
-        border-radius: 3px;
-        padding: 4px 8px;
-        margin: 0 2px;
-        cursor: pointer;
-        font-size: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #555;
-        min-width: 28px;
-        height: 28px;
-        transition: all 0.2s;
-      }
+      // 创建编辑器容器（初始隐藏）
+      this.editorContainer = document.createElement('div');
+      this.editorContainer.className = 'editor-container';
+      this.editorContainer.style.display = 'none';
       
-      .toolbar-button:hover {
-        background-color: var(--hover-color);
-        border-color: var(--border-color);
-      }
+      // 创建编辑区
+      this.editor = document.createElement('textarea');
+      this.editor.className = 'markdown-editor';
+      this.editorContainer.appendChild(this.editor);
       
-      .toolbar-button svg {
-        width: 16px;
-        height: 16px;
-        fill: currentColor;
-      }
+      // 引入KaTeX样式到Shadow DOM中
+      const katexStyle = document.createElement('link');
+      katexStyle.rel = 'stylesheet';
+      katexStyle.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css';
+      katexStyle.integrity = 'sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV';
+      katexStyle.crossOrigin = 'anonymous';
       
-      .toolbar-zoom {
-        display: flex;
-        align-items: center;
-      }
+      // 添加基本样式
+      const style = document.createElement('style');
+      style.textContent = `
+          :host {
+              display: block;
+              border: 1px solid #ddd;
+              border-radius: 4px;
+              margin: 10px 0;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+          }
+          
+          .toolbar {
+              display: flex;
+              padding: 8px;
+              background-color: #f5f5f5;
+              border-bottom: 1px solid #ddd;
+              border-top-left-radius: 4px;
+              border-top-right-radius: 4px;
+              position: sticky;
+              top: 0;
+              z-index: 10;
+          }
+          
+          .toolbar button {
+              margin-right: 5px;
+              background-color: #fff;
+              border: 1px solid #ddd;
+              border-radius: 3px;
+              padding: 5px 10px;
+              cursor: pointer;
+              font-size: 14px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+          }
+          
+          .toolbar button:hover {
+              background-color: #f0f0f0;
+          }
+          
+          .toolbar button.active {
+              background-color: #e6f7ff;
+              border-color: #1890ff;
+              color: #1890ff;
+          }
+          
+          .toolbar .separator {
+              width: 1px;
+              background-color: #ddd;
+              margin: 0 8px;
+              height: 24px;
+          }
+          
+          .toolbar .spacer {
+              flex-grow: 1;
+          }
+          
+          .markdown-content {
+              padding: 20px;
+              line-height: 1.6;
+              color: #24292e;
+              overflow-wrap: break-word;
+              transition: transform 0.2s ease;
+              min-height: 100px;
+          }
+          
+          .editor-container {
+              padding: 10px;
+              background-color: #f8f9fa;
+          }
+          
+          .markdown-editor {
+              width: 100%;
+              min-height: 300px;
+              padding: 10px;
+              font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+              font-size: 14px;
+              line-height: 1.5;
+              border: 1px solid #ddd;
+              border-radius: 3px;
+              resize: vertical;
+          }
+          
+          .markdown-content code:not(.hljs) {
+              background-color: rgba(27, 31, 35, 0.05);
+              border-radius: 3px;
+              font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+              font-size: 85%;
+              padding: 0.2em 0.4em;
+          }
+          
+          .markdown-content pre {
+              background-color: #f6f8fa;
+              border-radius: 3px;
+              font-size: 85%;
+              line-height: 1.45;
+              overflow: auto;
+              padding: 16px;
+          }
+          
+          .markdown-content h1 { font-size: 2em; margin-top: 1.5em; }
+          .markdown-content h2 { font-size: 1.5em; margin-top: 1.5em; }
+          .markdown-content h3 { font-size: 1.25em; margin-top: 1.5em; }
+          .markdown-content h4 { font-size: 1em; margin-top: 1.5em; }
+          .markdown-content h5 { font-size: 0.875em; margin-top: 1.5em; }
+          .markdown-content h6 { font-size: 0.85em; margin-top: 1.5em; }
+          
+          .markdown-content blockquote {
+              border-left: 4px solid #dfe2e5;
+              color: #6a737d;
+              margin: 1em 0;
+              padding: 0 1em;
+          }
+          
+          .markdown-content table {
+              border-collapse: collapse;
+              border-spacing: 0;
+              display: block;
+              overflow: auto;
+              width: 100%;
+              margin: 1em 0;
+          }
+          
+          .markdown-content table th,
+          .markdown-content table td {
+              border: 1px solid #dfe2e5;
+              padding: 6px 13px;
+          }
+          
+          .markdown-content table tr {
+              background-color: #fff;
+              border-top: 1px solid #c6cbd1;
+          }
+          
+          .markdown-content table tr:nth-child(2n) {
+              background-color: #f6f8fa;
+          }
+          
+          .markdown-content img {
+              max-width: 100%;
+              box-sizing: border-box;
+          }
+          
+          .markdown-content hr {
+              background-color: #e1e4e8;
+              border: 0;
+              height: 0.25em;
+              margin: 24px 0;
+              padding: 0;
+          }
+          
+          .math-block {
+              overflow-x: auto;
+              margin: 1em 0;
+          }
+          
+          .button-icon {
+              width: 16px;
+              height: 16px;
+              margin-right: 4px;
+          }
+          
+          @media (max-width: 768px) {
+              .toolbar button span {
+                  display: none;
+              }
+              
+              .toolbar button .button-icon {
+                  margin-right: 0;
+              }
+          }
+      `;
       
-      .zoom-level {
-        margin: 0 6px;
-        font-size: 13px;
-        min-width: 40px;
-        text-align: center;
-      }
+      // 将样式和组件添加到Shadow DOM
+      this.shadowRoot.appendChild(katexStyle);
+      this.shadowRoot.appendChild(style);
+      this.shadowRoot.appendChild(this.toolbar);
+      this.shadowRoot.appendChild(this.contentContainer);
+      this.shadowRoot.appendChild(this.editorContainer);
       
-      /* 编辑器容器样式 */
-      .editor-container {
-        display: flex;
-        gap: 12px;
-        position: relative;
-      }
+      // 配置marked
+      this._configureMarked();
       
-      #editor, #preview {
-        width: 100%;
-        min-height: 300px;
-        padding: 15px;
-        border: 1px solid var(--border-color);
-        border-radius: 0 0 4px 4px;
-        box-sizing: border-box;
-        transition: font-size 0.2s;
-      }
+      // 创建工具栏
+      this._createToolbar();
       
-      #editor {
-        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-        font-size: 14px;
-        line-height: 1.5;
-        resize: vertical;
-        tab-size: 2;
-        overflow-y: auto;
-      }
-      
-      #preview {
-        background-color: #fff;
-        overflow-y: auto;
-        line-height: 1.6;
-      }
-      
-      /* Markdown渲染样式 */
-      #preview h1, #preview h2, #preview h3 {
-        margin-top: 1.5em;
-        margin-bottom: 0.5em;
-        border-bottom: 1px solid var(--border-color);
-        padding-bottom: 0.3em;
-      }
-      
-      #preview code {
-        background-color: #f6f8fa;
-        padding: 0.2em 0.4em;
-        border-radius: 3px;
-        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-        font-size: 0.9em;
-      }
-      
-      #preview pre code {
-        display: block;
-        padding: 16px;
-        overflow: auto;
-        line-height: 1.45;
-      }
-      
-      #preview blockquote {
-        padding: 0 1em;
-        color: #6a737d;
-        border-left: 0.25em solid #dfe2e5;
-        margin: 0 0 16px 0;
-      }
-      
-      #preview table {
-        border-collapse: collapse;
-        width: 100%;
-        margin-bottom: 16px;
-      }
-      
-      #preview table th, #preview table td {
-        border: 1px solid #dfe2e5;
-        padding: 6px 13px;
-      }
-      
-      #preview table tr:nth-child(2n) {
-        background-color: #f6f8fa;
-      }
-      
-      /* 调整编辑器大小时的样式 */
-      .resizing {
-        cursor: ns-resize;
-        user-select: none;
-      }
-    `;
-
-    // 创建工具栏
-    const toolbar = document.createElement('div');
-    toolbar.className = 'toolbar';
-    toolbar.innerHTML = `
-      <div class="toolbar-group">
-        <button class="toolbar-button" title="加粗" data-action="bold">
-          <svg viewBox="0 0 24 24"><path d="M15.6 11.8c.97-.67 1.65-1.77 1.65-2.8 0-2.21-1.79-4-4-4H8v14h5.9c2.21 0 4-1.79 4-4 0-1.23-.56-2.33-1.4-3.07zM10 7h3c.55 0 1 .45 1 1s-.45 1-1 1h-3V7zm3.5 10H10v-2h3.5c.55 0 1 .45 1 1s-.45 1-1 1z"/></svg>
-        </button>
-        <button class="toolbar-button" title="斜体" data-action="italic">
-          <svg viewBox="0 0 24 24"><path d="M10 5v2h2.5l-3.5 10H6v2h8v-2h-2.5l3.5-10H18V5z"/></svg>
-        </button>
-        <button class="toolbar-button" title="代码" data-action="code">
-          <svg viewBox="0 0 24 24"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
-        </button>
-      </div>
-      
-      <div class="toolbar-separator"></div>
-      
-      <div class="toolbar-group">
-        <button class="toolbar-button" title="标题" data-action="heading">
-          <svg viewBox="0 0 24 24"><path d="M3 17h18v2H3zm0-6h18v2H3zm0-6h18v2H3z"/></svg>
-        </button>
-        <button class="toolbar-button" title="列表" data-action="list">
-          <svg viewBox="0 0 24 24"><path d="M4 10.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm0-6c-.83 0-1.5.67-1.5 1.5S3.17 7.5 4 7.5 5.5 6.83 5.5 6 4.83 4.5 4 4.5zm0 12c-.83 0-1.5.68-1.5 1.5s.68 1.5 1.5 1.5 1.5-.68 1.5-1.5-.67-1.5-1.5-1.5zM7 19h14v-2H7v2zm0-6h14v-2H7v2zm0-8v2h14V5H7z"/></svg>
-        </button>
-        <button class="toolbar-button" title="引用" data-action="quote">
-          <svg viewBox="0 0 24 24"><path d="M7.17 17c.51 0 .98-.29 1.2-.74l1.42-2.84c.14-.28.21-.58.21-.89V8c0-.55-.45-1-1-1H5c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1h2l-1.03 2.06c-.45.89.2 1.94 1.2 1.94zm10 0c.51 0 .98-.29 1.2-.74l1.42-2.84c.14-.28.21-.58.21-.89V8c0-.55-.45-1-1-1h-4c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1h2l-1.03 2.06c-.45.89.2 1.94 1.2 1.94z"/></svg>
-        </button>
-      </div>
-      
-      <div class="toolbar-separator"></div>
-      
-      <div class="toolbar-group">
-        <button class="toolbar-button" title="行内公式" data-action="inline-math">
-          <span>分数</span>
-        </button>
-        <button class="toolbar-button" title="块级公式" data-action="block-math">
-          <span>积分</span>
-        </button>
-      </div>
-      
-      <div class="toolbar-separator"></div>
-      
-      <div class="toolbar-group toolbar-zoom">
-        <button class="toolbar-button" title="缩小字体" data-action="zoom-out">
-          <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14zM7 9h5v1H7z"/></svg>
-        </button>
-        <span class="zoom-level">100%</span>
-        <button class="toolbar-button" title="放大字体" data-action="zoom-in">
-          <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/><path d="M12 10h-2v2H9v-2H7V9h2V7h1v2h2z"/></svg>
-        </button>
-      </div>
-    `;
-
-    // 创建编辑器容器
-    const container = document.createElement('div');
-    container.className = 'editor-container';
-    container.innerHTML = `
-      <textarea id="editor" placeholder="在此输入Markdown文本..."></textarea>
-      <div id="preview"></div>
-    `;
-
-    shadow.appendChild(style);
-    shadow.appendChild(toolbar);
-    shadow.appendChild(container);
-    
-    this._initialize();
-  }
-
-  async _initialize() {
-    await this._loadDependencies();
-    this._setupEditor();
-    this._setupToolbar();
-    this._loadContent();
-  }
-
-  _loadDependencies() {
-    return new Promise((resolve) => {
-      const check = () => {
-        if (window.marked && window.katex && window.renderMathInElement) resolve();
-        else setTimeout(check, 50);
-      };
-      check();
-    });
-  }
-
-  _setupEditor() {
-    const editor = this.shadowRoot.getElementById('editor');
-    const preview = this.shadowRoot.getElementById('preview');
-    let isRendering = false;
-    this._zoomLevel = 100;
-
-    // 设置默认高度
-    const defaultHeight = 300;
-    editor.style.height = `${defaultHeight}px`;
-    preview.style.height = `${defaultHeight}px`;
-
-    // 创建独立渲染器实例
-    const renderOptions = {
-      delimiters: [
-        { left: '$$', right: '$$', display: true },
-        { left: '$', right: '$', display: false }
-      ],
-      strict: false,
-      output: 'html',
-    };
-
-    // 带锁的渲染函数
-    const safeRender = () => {
-      if (isRendering) return;
-      isRendering = true;
-      
-      try {
-        preview.innerHTML = marked.parse(editor.value);
-        
-        // 使用局部渲染公式
-        renderMathInElement(preview, {
-          ...renderOptions,
-          ignoredElements: (element) => !preview.contains(element)
-        });
-      } catch (error) {
-        console.error('Rendering error:', error);
-      } finally {
-        isRendering = false;
-      }
-    };
-
-    // 优化输入处理
-    let renderTimer;
-    editor.addEventListener('input', () => {
-      clearTimeout(renderTimer);
-      renderTimer = setTimeout(safeRender, 250);
-    });
-    
-    // 同步滚动
-    editor.addEventListener('scroll', () => {
-      const percentage = editor.scrollTop / (editor.scrollHeight - editor.clientHeight);
-      preview.scrollTop = percentage * (preview.scrollHeight - preview.clientHeight);
-    });
-
-    // 为编辑器添加Tab键处理
-    editor.addEventListener('keydown', (e) => {
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        const start = editor.selectionStart;
-        const end = editor.selectionEnd;
-        
-        // 插入两个空格作为Tab
-        editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
-        editor.selectionStart = editor.selectionEnd = start + 2;
-      }
-    });
-
-    this._renderFunction = safeRender;
-  }
-  
-  _setupToolbar() {
-    const editor = this.shadowRoot.getElementById('editor');
-    const zoomLevelEl = this.shadowRoot.querySelector('.zoom-level');
-    
-    // 设置工具栏按钮事件
-    this.shadowRoot.querySelectorAll('.toolbar-button').forEach(button => {
-      button.addEventListener('click', () => {
-        const action = button.dataset.action;
-        
-        switch (action) {
-          case 'bold':
-            this._insertText('**', '**', '粗体文本');
-            break;
-          case 'italic':
-            this._insertText('*', '*', '斜体文本');
-            break;
-          case 'code':
-            this._insertText('`', '`', '代码');
-            break;
-          case 'heading':
-            this._insertLine('## ', '标题');
-            break;
-          case 'list':
-            this._insertLine('- ', '列表项');
-            break;
-          case 'quote':
-            this._insertLine('> ', '引用文本');
-            break;
-          case 'inline-math':
-            this._insertText('$', '$', '\\frac{a}{b}');
-            break;
-          case 'block-math':
-            this._insertText('$', '$', '\\int f(x)dx');
-            break;
-          case 'zoom-in':
-            if (this._zoomLevel < 200) {
-              this._zoomLevel += 10;
-              this._updateZoom();
-            }
-            break;
-          case 'zoom-out':
-            if (this._zoomLevel > 60) {
-              this._zoomLevel -= 10;
-              this._updateZoom();
-            }
-            break;
-        }
+      // 添加编辑器事件监听
+      this.editor.addEventListener('input', () => {
+          this.markdownContent = this.editor.value;
+          this._renderContent();
       });
-    });
   }
   
-  _updateZoom() {
-    const a = 0;
-    const b = 10;
-    const editor = this.shadowRoot.getElementById('editor');
-    const preview = this.shadowRoot.getElementById('preview');
-    const zoomLevelEl = this.shadowRoot.querySelector('.zoom-level');
-    
-    const fontSize = 14 * (this._zoomLevel / 100);
-    editor.style.fontSize = `${fontSize}px`;
-    preview.style.fontSize = `${fontSize}px`;
-    zoomLevelEl.textContent = `${this._zoomLevel}%`;
-  }
-  
-  _insertText(before, after, placeholder) {
-    const editor = this.shadowRoot.getElementById('editor');
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    const selectedText = editor.value.substring(start, end);
-    const replacement = selectedText || placeholder;
-    
-    editor.value = editor.value.substring(0, start) + before + replacement + after + editor.value.substring(end);
-    
-    if (!selectedText) {
-      editor.selectionStart = start + before.length;
-      editor.selectionEnd = start + before.length + placeholder.length;
-    } else {
-      editor.selectionStart = start + before.length;
-      editor.selectionEnd = start + before.length + selectedText.length;
-    }
-    
-    editor.focus();
-    setTimeout(() => this._renderFunction(), 100);
-  }
-  
-  _insertLine(prefix, placeholder) {
-    const editor = this.shadowRoot.getElementById('editor');
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    const selectedText = editor.value.substring(start, end);
-    
-    // 检查选定文本前面是否需要添加换行符
-    let insertBefore = prefix;
-    if (start > 0 && editor.value.charAt(start - 1) !== '\n') {
-      insertBefore = '\n' + insertBefore;
-    }
-    
-    // 处理多行
-    if (selectedText.includes('\n')) {
-      const lines = selectedText.split('\n');
-      const newLines = lines.map(line => prefix + line).join('\n');
-      editor.value = editor.value.substring(0, start) + newLines + editor.value.substring(end);
-      editor.selectionStart = start;
-      editor.selectionEnd = start + newLines.length;
-    } else {
-      // 单行
-      const replacement = selectedText || placeholder;
-      editor.value = editor.value.substring(0, start) + insertBefore + replacement + editor.value.substring(end);
+  connectedCallback() {
+      // 获取初始Markdown内容
+      this.markdownContent = this.textContent.trim();
       
-      if (!selectedText) {
-        editor.selectionStart = start + insertBefore.length;
-        editor.selectionEnd = start + insertBefore.length + placeholder.length;
-      } else {
-        editor.selectionStart = start + insertBefore.length;
-        editor.selectionEnd = start + insertBefore.length + selectedText.length;
+      // 清空元素原始内容，避免重复显示
+      while (this.firstChild) {
+          this.removeChild(this.firstChild);
       }
-    }
-    
-    editor.focus();
-    setTimeout(() => this._renderFunction(), 100);
+      
+      // 渲染内容
+      this._renderContent();
+      
+      // 设置编辑器初始内容
+      this.editor.value = this.markdownContent;
   }
-
-  _loadContent() {
-    const script = this.querySelector('script[type="text/markdown"]');
-    let a = 0;
-    if (script) {
-      this.shadowRoot.getElementById('editor').value = script.textContent.trim();
-      setTimeout(() => this._renderFunction(), 100);
-    }
+  
+  // 创建工具栏
+  _createToolbar() {
+      // 编辑按钮
+      const editButton = this._createButton('编辑', 'edit', () => {
+          const isEditing = this.editorContainer.style.display !== 'none';
+          if (isEditing) {
+              // 保存并退出编辑
+              this.editorContainer.style.display = 'none';
+              this.contentContainer.style.display = 'block';
+              editButton.innerHTML = this._getIconSvg('edit') + '<span>编辑</span>';
+              this.markdownContent = this.editor.value;
+              this._renderContent();
+          } else {
+              // 进入编辑模式
+              this.editorContainer.style.display = 'block';
+              this.contentContainer.style.display = 'none';
+              editButton.innerHTML = this._getIconSvg('save') + '<span>保存</span>';
+              this.editor.focus();
+          }
+      });
+      this.toolbar.appendChild(editButton);
+      
+      // 分隔符
+      this.toolbar.appendChild(this._createSeparator());
+      
+      // 格式化工具
+      this.toolbar.appendChild(this._createFormatButton('', 'bold', '**', '**'));
+      this.toolbar.appendChild(this._createFormatButton('', 'italic', '*', '*'));
+      this.toolbar.appendChild(this._createFormatButton('', 'code', '`', '`'));
+      this.toolbar.appendChild(this._createFormatButton('', 'link', '[', '](url)'));
+      this.toolbar.appendChild(this._createFormatButton('', 'quote', '> ', ''));
+      
+      // 分隔符
+      this.toolbar.appendChild(this._createSeparator());
+      
+      // 数学公式
+      this.toolbar.appendChild(this._createFormatButton('', 'math-inline', '$', '$'));
+      this.toolbar.appendChild(this._createFormatButton('', 'math-block', '$$\n', '\n$$'));
+      
+      // 分隔符
+      this.toolbar.appendChild(this._createSeparator());
+      
+      // 插入标题
+      this.toolbar.appendChild(this._createFormatButton('', 'heading', '## ', ''));
+      
+      // 插入列表
+      this.toolbar.appendChild(this._createFormatButton('', 'list-ul', '- ', ''));
+      this.toolbar.appendChild(this._createFormatButton('', 'list-ol', '1. ', ''));
+      
+      // 空白填充
+      const spacer = document.createElement('div');
+      spacer.className = 'spacer';
+      this.toolbar.appendChild(spacer);
+      
+      // 缩放控制
+      const zoomOutButton = this._createButton('', 'zoom-out', () => this._zoom(-0.1));
+      const zoomResetButton = this._createButton('', 'zoom-reset', () => this._resetZoom());
+      const zoomInButton = this._createButton('', 'zoom-in', () => this._zoom(0.1));
+      
+      this.toolbar.appendChild(zoomOutButton);
+      this.toolbar.appendChild(zoomResetButton);
+      this.toolbar.appendChild(zoomInButton);
+  }
+  
+  // 创建按钮
+  _createButton(text, iconName, clickHandler) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.innerHTML = this._getIconSvg(iconName) + `<span>${text}</span>`;
+      button.addEventListener('click', clickHandler);
+      return button;
+  }
+  
+  // 创建格式化按钮
+  _createFormatButton(text, iconName, prefix, suffix) {
+      return this._createButton(text, iconName, () => {
+          this._formatText(prefix, suffix);
+      });
+  }
+  
+  // 创建分隔符
+  _createSeparator() {
+      const separator = document.createElement('div');
+      separator.className = 'separator';
+      return separator;
+  }
+  
+  // 获取图标SVG
+  _getIconSvg(iconName) {
+      const icons = {
+          'edit': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
+          'save': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>',
+          'bold': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path></svg>',
+          'italic': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><line x1="19" y1="4" x2="10" y2="4"></line><line x1="14" y1="20" x2="5" y2="20"></line><line x1="15" y1="4" x2="9" y2="20"></line></svg>',
+          'code': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>',
+          'link': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>',
+          'quote': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>',
+          'heading': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><path d="M6 12h12"></path><path d="M6 20V4"></path><path d="M18 20V4"></path></svg>',
+          'list-ul': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>',
+          'list-ol': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><line x1="10" y1="6" x2="21" y2="6"></line><line x1="10" y1="12" x2="21" y2="12"></line><line x1="10" y1="18" x2="21" y2="18"></line><path d="M4 6h1v4"></path><path d="M4 10h2"></path><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path></svg>',
+          'math-inline': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><line x1="4" y1="9" x2="20" y2="9"></line><line x1="4" y1="15" x2="20" y2="15"></line><line x1="10" y1="3" x2="8" y2="21"></line><line x1="16" y1="3" x2="14" y2="21"></line></svg>',
+          'math-block': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line><line x1="6" y1="12" x2="18" y2="12"></line></svg>',
+          'zoom-in': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>',
+          'zoom-out': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>',
+          'zoom-reset': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line><line x1="12" y1="16" x2="12" y2="8"></line></svg>'
+      };
+      
+      return icons[iconName] || '';
+  }
+  
+  // 格式化所选文本
+  _formatText(prefix, suffix) {
+      const editor = this.editor;
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      const selectedText = editor.value.substring(start, end);
+      const beforeText = editor.value.substring(0, start);
+      const afterText = editor.value.substring(end);
+      
+      // 更新文本
+      const newText = beforeText + prefix + selectedText + suffix + afterText;
+      editor.value = newText;
+      
+      // 更新光标位置
+      if (selectedText.length === 0) {
+          // 无选中文本时，将光标放在前缀后面
+          editor.selectionStart = editor.selectionEnd = start + prefix.length;
+      } else {
+          // 有选中文本时，保持选择该文本
+          editor.selectionStart = start + prefix.length;
+          editor.selectionEnd = end + prefix.length;
+      }
+      
+      // 触发input事件以更新内容
+      editor.dispatchEvent(new Event('input'));
+      
+      // 保持焦点在编辑器
+      editor.focus();
+  }
+  
+  // 配置marked解析器
+  _configureMarked() {
+      // 创建自定义渲染器，处理数学公式
+      const renderer = new marked.Renderer();
+      
+      // 保存原始的段落渲染方法
+      const originalParagraph = renderer.paragraph.bind(renderer);
+      
+      // 自定义段落渲染，处理块级数学公式
+      renderer.paragraph = (text) => {
+          // 检查是否为 $$ 包围的数学公式
+          if (text.startsWith('$$') && text.endsWith('$$')) {
+              const formula = text.slice(2, -2).trim();
+              try {
+                  const html = katex.renderToString(formula, {
+                      displayMode: true,
+                      throwOnError: false
+                  });
+                  return `<div class="math-block">${html}</div>`;
+              } catch (e) {
+                  console.error('KaTeX rendering error:', e);
+                  return `<div class="math-block error">数学公式渲染错误: ${e.message}</div>`;
+              }
+          }
+          return originalParagraph(text);
+      };
+      
+      // 配置marked选项
+      marked.setOptions({
+          renderer: renderer,
+          headerIds: true,
+          gfm: true,
+          breaks: false,
+          pedantic: false,
+          sanitize: false,
+          smartLists: true,
+          smartypants: false,
+          xhtml: false
+      });
+  }
+  
+  // 渲染内容
+  _renderContent() {
+      // 如果没有内容，不进行渲染
+      if (!this.markdownContent) return;
+      
+      // 使用marked解析Markdown
+      const html = marked.parse(this.markdownContent);
+      this.contentContainer.innerHTML = html;
+      
+      // 渲染行内数学公式
+      this._renderInlineMath();
+      
+      // 应用当前缩放级别
+      this._applyZoom();
+  }
+  
+  // 渲染行内数学公式
+  _renderInlineMath() {
+      renderMathInElement(this.contentContainer, {
+          delimiters: [
+              { left: '$$', right: '$$', display: true },
+              { left: '$', right: '$', display: false },
+              { left: '\\(', right: '\\)', display: false },
+              { left: '\\[', right: '\\]', display: true }
+          ],
+          throwOnError: false,
+          // 避免二次渲染，不处理已经由KaTeX处理过的元素
+          ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "annotation", "annotation-xml", ".math-block"]
+      });
+  }
+  
+  // 缩放内容
+  _zoom(factor) {
+      this.zoomLevel = Math.max(0.5, Math.min(2.0, this.zoomLevel + factor));
+      this._applyZoom();
+  }
+  
+  // 重置缩放
+  _resetZoom() {
+      this.zoomLevel = 1.0;
+      this._applyZoom();
+  }
+  
+  // 应用缩放
+  _applyZoom() {
+      this.contentContainer.style.transform = `scale(${this.zoomLevel})`;
+      this.contentContainer.style.transformOrigin = 'top left';
+  }
+  
+  disconnectedCallback() {
+      // 清理资源
   }
 }
 
-customElements.define('markdown-area', MarkdownArea);
+// 定义自定义元素
+customElements.define('markdown-renderer', MarkdownRenderer);
