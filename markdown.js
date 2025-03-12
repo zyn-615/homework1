@@ -27,6 +27,10 @@ class MarkdownRenderer extends HTMLElement {
       this.editor.className = 'markdown-editor';
       this.editorContainer.appendChild(this.editor);
       
+      // 初始化历史记录堆栈用于撤销和前进功能
+      this.historyStack = [];
+      this.currentHistoryIndex = -1;
+      
       // 引入KaTeX样式到Shadow DOM中
       const katexStyle = document.createElement('link');
       katexStyle.rel = 'stylesheet';
@@ -78,6 +82,11 @@ class MarkdownRenderer extends HTMLElement {
               background-color: #e6f7ff;
               border-color: #1890ff;
               color: #1890ff;
+          }
+          
+          .toolbar button:disabled {
+              opacity: 0.5;
+              cursor: not-allowed;
           }
           
           .toolbar .separator {
@@ -222,8 +231,26 @@ class MarkdownRenderer extends HTMLElement {
       
       // 添加编辑器事件监听
       this.editor.addEventListener('input', () => {
+          // 将当前状态添加到历史记录
+          this._saveToHistory();
           this.markdownContent = this.editor.value;
           this._renderContent();
+          this._updateHistoryButtonsState();
+      });
+      
+      // 添加键盘快捷键监听
+      this.editor.addEventListener('keydown', (e) => {
+          // 检测Ctrl+Z (Windows/Linux) 或 Cmd+Z (Mac)
+          if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+              e.preventDefault();
+              this._undo();
+          }
+          // 检测Ctrl+Y 或 Ctrl+Shift+Z 或 Cmd+Shift+Z (Mac)
+          else if (((e.ctrlKey || e.metaKey) && e.key === 'y') || 
+                  ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z')) {
+              e.preventDefault();
+              this._redo();
+          }
       });
   }
   
@@ -241,6 +268,10 @@ class MarkdownRenderer extends HTMLElement {
       
       // 设置编辑器初始内容
       this.editor.value = this.markdownContent;
+      
+      // 初始化历史记录
+      this._saveToHistory();
+      this._updateHistoryButtonsState();
   }
   
   // 创建工具栏
@@ -264,6 +295,19 @@ class MarkdownRenderer extends HTMLElement {
           }
       });
       this.toolbar.appendChild(editButton);
+      
+      // 分隔符
+      this.toolbar.appendChild(this._createSeparator());
+      
+      // 撤销按钮
+      this.undoButton = this._createButton('', 'undo', () => this._undo());
+      this.undoButton.disabled = true; // 初始禁用
+      this.toolbar.appendChild(this.undoButton);
+      
+      // 前进按钮
+      this.redoButton = this._createButton('', 'redo', () => this._redo());
+      this.redoButton.disabled = true; // 初始禁用
+      this.toolbar.appendChild(this.redoButton);
       
       // 分隔符
       this.toolbar.appendChild(this._createSeparator());
@@ -335,6 +379,8 @@ class MarkdownRenderer extends HTMLElement {
       const icons = {
           'edit': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
           'save': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>',
+          'undo': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>',
+          'redo': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path></svg>',
           'bold': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path></svg>',
           'italic': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><line x1="19" y1="4" x2="10" y2="4"></line><line x1="14" y1="20" x2="5" y2="20"></line><line x1="15" y1="4" x2="9" y2="20"></line></svg>',
           'code': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="button-icon"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>',
@@ -353,6 +399,65 @@ class MarkdownRenderer extends HTMLElement {
       return icons[iconName] || '';
   }
   
+  // 撤销功能
+  _undo() {
+      if (this.currentHistoryIndex > 0) {
+          this.currentHistoryIndex--;
+          const previousState = this.historyStack[this.currentHistoryIndex];
+          this.editor.value = previousState;
+          this.markdownContent = previousState;
+          this._renderContent();
+          this._updateHistoryButtonsState();
+      }
+  }
+  
+  // 前进功能
+  _redo() {
+      if (this.currentHistoryIndex < this.historyStack.length - 1) {
+          this.currentHistoryIndex++;
+          const nextState = this.historyStack[this.currentHistoryIndex];
+          this.editor.value = nextState;
+          this.markdownContent = nextState;
+          this._renderContent();
+          this._updateHistoryButtonsState();
+      }
+  }
+  
+  // 更新撤销和前进按钮状态
+  _updateHistoryButtonsState() {
+      if (this.undoButton) {
+          this.undoButton.disabled = this.currentHistoryIndex <= 0;
+      }
+      
+      if (this.redoButton) {
+          this.redoButton.disabled = this.currentHistoryIndex >= this.historyStack.length - 1;
+      }
+  }
+  
+  // 保存到历史记录
+  _saveToHistory() {
+      const currentValue = this.editor.value;
+      
+      // 如果当前值与历史记录中最新的状态不同
+      if (this.historyStack.length === 0 || currentValue !== this.historyStack[this.currentHistoryIndex]) {
+          // 如果我们在历史记录中间进行了编辑，删除之后的历史记录
+          if (this.currentHistoryIndex < this.historyStack.length - 1) {
+              this.historyStack = this.historyStack.slice(0, this.currentHistoryIndex + 1);
+          }
+          
+          // 将当前状态添加到历史记录
+          this.historyStack.push(currentValue);
+          
+          // 如果历史记录过长，删除最旧的记录
+          const maxHistoryLength = 50;
+          if (this.historyStack.length > maxHistoryLength) {
+              this.historyStack.shift();
+          } else {
+              this.currentHistoryIndex++;
+          }
+      }
+  }
+  
   // 格式化所选文本
   _formatText(prefix, suffix) {
       const editor = this.editor;
@@ -361,6 +466,9 @@ class MarkdownRenderer extends HTMLElement {
       const selectedText = editor.value.substring(start, end);
       const beforeText = editor.value.substring(0, start);
       const afterText = editor.value.substring(end);
+      
+      // 将当前状态添加到历史记录
+      this._saveToHistory();
       
       // 更新文本
       const newText = beforeText + prefix + selectedText + suffix + afterText;
