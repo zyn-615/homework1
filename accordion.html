@@ -74,8 +74,9 @@
     </style>
 </head>
 <body>
-    <!-- 示例使用 -->
-    <x-accordion>
+    <!-- 示例使用（单一展开模式） -->
+    <h3>单一展开模式 (默认)</h3>
+    <x-accordion mode="single">
         <x-accordion-item>
             <x-accordion-header>第一项</x-accordion-header>
             <x-accordion-panel>
@@ -118,9 +119,34 @@
             </x-accordion-panel>
         </x-accordion-item>
     </x-accordion>
-
-    <script>
-        // 基础 HTMLElement 扩展类
-    </script>
+    
+    <!-- 示例使用（多重展开模式） -->
+    <h3>多重展开模式</h3>
+    <x-accordion mode="multiple">
+        <x-accordion-item>
+            <x-accordion-header>第一项</x-accordion-header>
+            <x-accordion-panel>
+                <x-accordion-panel-inner>
+                    这是第一项的内容
+                </x-accordion-panel-inner>
+            </x-accordion-panel>
+        </x-accordion-item>
+        <x-accordion-item>
+            <x-accordion-header>第二项</x-accordion-header>
+            <x-accordion-panel>
+                <x-accordion-panel-inner>
+                    这是第二项的内容
+                </x-accordion-panel-inner>
+            </x-accordion-panel>
+        </x-accordion-item>
+        <x-accordion-item>
+            <x-accordion-header>第三项</x-accordion-header>
+            <x-accordion-panel>
+                <x-accordion-panel-inner>
+                    这是第三项的内容
+                </x-accordion-panel-inner>
+            </x-accordion-panel>
+        </x-accordion-item>
+    </x-accordion>
 </body>
 </html>

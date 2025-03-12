@@ -20,33 +20,99 @@ class BaseElement extends HTMLElement {
 class XAccordion extends BaseElement {
   constructor() {
       super();
-      this._expandedItem = null;
+      this._expandedItems = new Set();
+      this._observer = null;
+  }
+  
+  get mode() {
+      return this.getAttribute('mode') || 'single';
+  }
+  
+  set mode(value) {
+      this.setAttribute('mode', value);
+  }
+  
+  static get observedAttributes() {
+      return ['mode'];
+  }
+  
+  attributeChangedCallback(name, oldValue, newValue) {
+      if (name === 'mode' && oldValue !== newValue && this._connected) {
+          // 如果从多重模式切换到单一模式，需要关闭除第一个以外的所有展开项
+          if (newValue === 'single' && this._expandedItems.size > 1) {
+              // 保留第一个展开的项
+              const firstItem = this._expandedItems.values().next().value;
+              
+              // 关闭其他所有项
+              for (const item of this._expandedItems) {
+                  if (item !== firstItem) {
+                      item.collapse();
+                  }
+              }
+              
+              // 清空集合并添加第一个项
+              this._expandedItems.clear();
+              if (firstItem) {
+                  this._expandedItems.add(firstItem);
+              }
+          }
+      }
   }
   
   initialize() {
-      // 初始激活第一个子项（可选）
-      // const firstItem = this.querySelector('x-accordion-item');
-      // if (firstItem) this.expandItem(firstItem);
-      
       // 监听项目展开/折叠事件
       this.addEventListener('accordion-item-expand', this._handleItemExpand.bind(this));
+      this.addEventListener('accordion-item-collapse', this._handleItemCollapse.bind(this));
+      
+      // 观察子项目的添加和删除
+      this._observer = new MutationObserver(this._handleDOMChanges.bind(this));
+      this._observer.observe(this, { childList: true });
+  }
+  
+  disconnectedCallback() {
+      if (this._observer) {
+          this._observer.disconnect();
+          this._observer = null;
+      }
+  }
+  
+  _handleDOMChanges(mutations) {
+      for (const mutation of mutations) {
+          if (mutation.type === 'childList') {
+              // 处理移除的节点
+              for (const node of mutation.removedNodes) {
+                  if (node instanceof XAccordionItem && this._expandedItems.has(node)) {
+                      this._expandedItems.delete(node);
+                  }
+              }
+          }
+      }
   }
   
   _handleItemExpand(event) {
       // 确保事件是直接子项发出的，不处理嵌套accordion的事件
-      const isDirectChild = event.target.parentElement === this;
-      if (!isDirectChild) return;
-      
-      // 获取当前展开的项
       const expandingItem = event.target;
+      if (expandingItem.parentElement !== this) return;
       
-      // 如果已有展开项且不是当前项，则关闭它
-      if (this._expandedItem && this._expandedItem !== expandingItem) {
-          this._expandedItem.collapse();
+      // 添加到展开项集合
+      this._expandedItems.add(expandingItem);
+      
+      // 单一模式下关闭其他项
+      if (this.mode === 'single' && this._expandedItems.size > 1) {
+          for (const item of this._expandedItems) {
+              if (item !== expandingItem) {
+                  item.collapse();
+              }
+          }
       }
+  }
+  
+  _handleItemCollapse(event) {
+      const collapsingItem = event.target;
+      if (collapsingItem.parentElement !== this) return;
       
-      // 更新当前展开项的引用
-      this._expandedItem = expandingItem;
+      // 从展开项集合中移除
+      this._expandedItems.delete(collapsingItem);
   }
 }
 
@@ -57,6 +123,10 @@ class XAccordionItem extends BaseElement {
       this._expanded = false;
       this._header = null;
       this._panel = null;
+  }
+  
+  get expanded() {
+      return this._expanded;
   }
   
   initialize() {
@@ -204,6 +274,13 @@ class XAccordionItem extends BaseElement {
       
       // 过渡到高度0
       this._panel.style.height = '0';
+      
+      // 触发折叠事件
+      const event = new CustomEvent('accordion-item-collapse', {
+          bubbles: true,
+          detail: { item: this }
+      });
+      this.dispatchEvent(event);
   }
 }
 
