@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自定义 Accordion 组件</title>
+    <style>
+        /* 基础样式 */
+        :root {
+            --accordion-border-color: #ddd;
+            --accordion-header-bg: #f5f5f5;
+            --accordion-header-hover-bg: #e9e9e9;
+            --accordion-transition: 300ms ease-out;
+        }
+        
+        x-accordion {
+            display: block;
+            border: 1px solid var(--accordion-border-color);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+        
+        x-accordion-item {
+            display: block;
+            border-bottom: 1px solid var(--accordion-border-color);
+        }
+        
+        x-accordion-item:last-child {
+            border-bottom: none;
+        }
+        
+        x-accordion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background-color: var(--accordion-header-bg);
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        x-accordion-header:hover {
+            background-color: var(--accordion-header-hover-bg);
+        }
+        
+        x-accordion-header::after {
+            content: "▼";
+            font-size: 0.7em;
+            transition: transform var(--accordion-transition);
+        }
+        
+        x-accordion-item[expanded] x-accordion-header::after {
+            transform: rotate(180deg);
+        }
+        
+        x-accordion-panel {
+            display: block;
+            height: 0;
+            overflow: hidden;
+            transition: height var(--accordion-transition);
+        }
+        
+        x-accordion-panel-inner {
+            display: block;
+            padding: 16px;
+        }
+        
+        /* 嵌套样式调整 */
+        x-accordion x-accordion {
+            margin: 8px 0;
+            border: 1px solid var(--accordion-border-color);
+        }
+    </style>
+</head>
+<body>
+    <!-- 示例使用 -->
+    <x-accordion>
+        <x-accordion-item>
+            <x-accordion-header>第一项</x-accordion-header>
+            <x-accordion-panel>
+                <x-accordion-panel-inner>
+                    这是第一项的内容
+                </x-accordion-panel-inner>
+            </x-accordion-panel>
+        </x-accordion-item>
+        <x-accordion-item>
+            <x-accordion-header>第二项</x-accordion-header>
+            <x-accordion-panel>
+                <x-accordion-panel-inner>
+                    这是第二项的内容
+                </x-accordion-panel-inner>
+            </x-accordion-panel>
+        </x-accordion-item>
+        <x-accordion-item>
+            <x-accordion-header>第三项（带嵌套）</x-accordion-header>
+            <x-accordion-panel>
+                <x-accordion-panel-inner>
+                    <x-accordion>
+                        <x-accordion-item>
+                            <x-accordion-header>嵌套项 1</x-accordion-header>
+                            <x-accordion-panel>
+                                <x-accordion-panel-inner>
+                                    这是嵌套项 1 的内容
+                                </x-accordion-panel-inner>
+                            </x-accordion-panel>
+                        </x-accordion-item>
+                        <x-accordion-item>
+                            <x-accordion-header>嵌套项 2</x-accordion-header>
+                            <x-accordion-panel>
+                                <x-accordion-panel-inner>
+                                    这是嵌套项 2 的内容
+                                </x-accordion-panel-inner>
+                            </x-accordion-panel>
+                        </x-accordion-item>
+                    </x-accordion>
+                </x-accordion-panel-inner>
+            </x-accordion-panel>
+        </x-accordion-item>
+    </x-accordion>
+
+    <script>
+        // 基础 HTMLElement 扩展类
+    </script>
+</body>
+</html>
