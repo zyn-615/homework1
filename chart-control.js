@@ -175,29 +175,40 @@ template.innerHTML = `
   <div class="chart"></div>
 </div>`;
 
+// 定义自定义元素类
 class ChartControl extends HTMLElement {
+  // 构造函数
   constructor() {
     super();
-    this.tempDataStorage = [];
-    this.chartInstance = null;
-    this.echarts = null;
-    this._shadowRoot = this.attachShadow({ mode: 'open' });
-    this._shadowRoot.appendChild(template.content.cloneNode(true));
+    this.tempDataStorage = [];    // 临时数据存储数组
+    this.chartInstance = null;    // ECharts实例
+    this.echarts = null;          // ECharts库引用
+    this._shadowRoot = this.attachShadow({ mode: 'open' }); // 创建Shadow DOM
+    this._shadowRoot.appendChild(template.content.cloneNode(true)); // 克隆模板到Shadow DOM
   }
 
+  // 元素连接到DOM时调用
   async connectedCallback() {
     try {
+      // 动态加载ECharts库
       await import('https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js');
-      this.echarts = window.echarts;
+      this.echarts = window.echarts; // 获取ECharts引用
+      // 初始化图表实例
       this.chartInstance = this.echarts.init(this._shadowRoot.querySelector('.chart'));
+      
+      // 添加按钮点击事件监听
       this._shadowRoot.querySelector('.add-btn').addEventListener('click', () => this.addDataItem());
+      // 生成图表按钮点击事件监听
       this._shadowRoot.querySelector('.render-btn').addEventListener('click', () => this.renderChart());
+      
+      // 数据列表点击事件（处理删除）
       this._shadowRoot.querySelector('.data-list').addEventListener('click', e => {
         if (e.target.classList.contains('delete-btn')) {
           this.deleteDataItem(e.target.dataset.index);
         }
       });
       
+      // 数据项鼠标悬停高亮图表
       this._shadowRoot.querySelector('.data-list').addEventListener('mouseover', e => {
         const dataItem = e.target.closest('.data-item');
         if (dataItem && this.chartInstance) {
@@ -206,16 +217,18 @@ class ChartControl extends HTMLElement {
         }
       });
       
+      // 鼠标移出时重置高亮
       this._shadowRoot.querySelector('.data-list').addEventListener('mouseout', e => {
         if (this.chartInstance) {
           this.resetChartHighlight();
         }
       });
     } catch (error) {
-      console.error('ECharts 加载失败:', error);
+      console.error('ECharts 加载失败:', error); // 加载失败时输出错误
     }
   }
   
+  // 高亮图表中的指定项
   highlightChartItem(index) {
     if (!this.chartInstance) return;
     
@@ -235,6 +248,7 @@ class ChartControl extends HTMLElement {
     }
   }
   
+  // 重置图表高亮状态
   resetChartHighlight() {
     if (!this.chartInstance) return;
     
@@ -243,20 +257,27 @@ class ChartControl extends HTMLElement {
     });
   }
 
+  // 添加数据项
   addDataItem() {
     const categoryInput = this._shadowRoot.querySelector('.category');
     const valueInput = this._shadowRoot.querySelector('.value');
     
+    // 检查输入是否为空
     if (!categoryInput.value || !valueInput.value) return;
+    
+    // 添加数据到临时存储
     this.tempDataStorage.push({
       category: categoryInput.value,
       value: parseFloat(valueInput.value)
     });
-    this.updateDataList();
+    
+    this.updateDataList(); // 更新数据列表显示
+    // 清空输入框
     categoryInput.value = '';
     valueInput.value = '';
   }
 
+  // 渲染图表
   renderChart() {
     if (!this.echarts || !this.chartInstance) {
       console.error('ECharts 未加载成功，无法渲染图表');
@@ -265,30 +286,33 @@ class ChartControl extends HTMLElement {
     
     const chartType = this._shadowRoot.querySelector('.chart-type').value;
     
+    // 定义颜色数组
     const colors = [
       '#BAE1FF', '#BAFFC9', '#FFB3BA', '#FFD8B1',
       '#E6C9FF', '#B4F8C8', '#FBE7C6', '#D8E2DC',
       '#A0E7E5', '#FFC7C7'
     ];
     
+    // 图表基础配置
     let option = {
       tooltip: {
         trigger: 'item',
-        formatter: '{a} <br/>{b}: {c} ({d}%)'
+        formatter: '{a} <br/>{b}: {c} ({d}%)' // 工具提示格式
       }
     };
     
+    // 根据图表类型配置选项
     if (chartType === 'pie') {
       option.series = [{
         name: '数据分布',
         type: 'pie',
-        radius: ['40%', '70%'],
-        center: ['50%', '50%'],
+        radius: ['40%', '70%'],    // 饼图内外半径
+        center: ['50%', '50%'],    // 居中
         data: this.tempDataStorage.map((item, index) => ({
           value: item.value,
           name: item.category,
           itemStyle: {
-            color: colors[index % colors.length]
+            color: colors[index % colors.length] // 循环使用颜色
           }
         })),
         label: {
@@ -297,15 +321,6 @@ class ChartControl extends HTMLElement {
           formatter: '{b}',
           textStyle: {
             fontSize: 14
-          },
-          overflow: 'break',
-          rich: {
-            name: {
-              textStyle: {
-                fontSize: 14
-              },
-              color: '#333'
-            }
           }
         },
         labelLine: {
@@ -333,7 +348,7 @@ class ChartControl extends HTMLElement {
         data: this.tempDataStorage.map(item => item.category),
         axisLabel: {
           interval: 0,
-          rotate: 30
+          rotate: 30             // 标签旋转30度
         }
       };
       option.yAxis = {
@@ -367,15 +382,18 @@ class ChartControl extends HTMLElement {
       }];
     }
     
+    // 设置图表选项并渲染
     this.chartInstance.setOption(option, true);
   }
 
+  // 删除数据项
   deleteDataItem(index) {
-    this.tempDataStorage.splice(index, 1);
-    this.updateDataList();
-    if (this.tempDataStorage.length > 0) this.renderChart();
+    this.tempDataStorage.splice(index, 1); // 从数组中移除指定项
+    this.updateDataList(); // 更新显示
+    if (this.tempDataStorage.length > 0) this.renderChart(); // 如果还有数据则重新渲染
   }
 
+  // 更新数据列表显示
   updateDataList() {
     const dataList = this._shadowRoot.querySelector('.data-list');
     dataList.innerHTML = this.tempDataStorage
@@ -387,8 +405,9 @@ class ChartControl extends HTMLElement {
           </div>
           <div class="delete-btn" data-index="${index}">删除</div>
         </div>
-      `).join('');
+      `).join(''); // 生成HTML并加入列表
   }
 }
 
+// 注册自定义元素
 customElements.define('chart-control', ChartControl);
